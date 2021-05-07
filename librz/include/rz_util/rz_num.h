@@ -35,7 +35,8 @@ typedef enum {
 	RNCSHL = '<',
 	RNCSHR = '>',
 	RNCROL = '#',
-	RNCROR = '$'
+	RNCROR = '$',
+	RNPOW = '@'
 } RNumCalcToken;
 
 typedef struct rz_num_calc_t {

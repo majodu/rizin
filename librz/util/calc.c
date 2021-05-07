@@ -13,6 +13,7 @@
 
 #include <rz_types.h>
 #include <rz_util.h>
+#include <math.h>
 #include <ctype.h>
 #include <stdio.h>
 
@@ -33,6 +34,11 @@ static inline RNumCalcValue Nsetf(double v) {
 static inline RNumCalcValue Naddi(RNumCalcValue n, ut64 v) {
 	n.d += (double)v;
 	n.n += v;
+	return n;
+}
+static inline RNumCalcValue Npower(RNumCalcValue n,RNumCalcValue v){
+	n.n = (int)pow((double)n.n,(double)v.n);
+	n.d = pow(n.d, v.d);
 	return n;
 }
 static inline RNumCalcValue Nsubi(RNumCalcValue n, ut64 v) {
@@ -148,6 +154,7 @@ static RNumCalcValue expr(RNum *num, RNumCalc *nc, int get) {
 		case RNCXOR: left = Nxor(left, term(num, nc, 1)); break;
 		case RNCORR: left = Norr(left, term(num, nc, 1)); break;
 		case RNCAND: left = Nand(left, term(num, nc, 1)); break;
+		case RNPOW: left = Npower(left,term(num, nc, 1));break;
 		default:
 			return left;
 		}
@@ -157,6 +164,7 @@ static RNumCalcValue expr(RNum *num, RNumCalc *nc, int get) {
 
 static RNumCalcValue term(RNum *num, RNumCalc *nc, int get) {
 	RNumCalcValue left = prim(num, nc, get);
+	
 	for (;;) {
 		if (nc->curr_tok == RNCMUL) {
 			left = Nmul(left, prim(num, nc, 1));
@@ -182,10 +190,12 @@ static RNumCalcValue term(RNum *num, RNumCalc *nc, int get) {
 
 static RNumCalcValue prim(RNum *num, RNumCalc *nc, int get) {
 	RNumCalcValue v = { 0 };
+
 	if (get) {
 		get_token(num, nc);
 	}
 	switch (nc->curr_tok) {
+		
 	case RNCNUMBER:
 		v = nc->number_value;
 		get_token(num, nc);
@@ -235,6 +245,7 @@ static RNumCalcValue prim(RNum *num, RNumCalc *nc, int get) {
 	case RNCASSIGN:
 	case RNCRIGHTP:
 	case RNCSHL:
+	case RNPOW:
 	case RNCSHR:
 	case RNCROL:
 	case RNCROR:
@@ -309,13 +320,11 @@ static int cin_get_num(RNum *num, RNumCalc *nc, RNumCalcValue *n) {
 
 static RNumCalcToken get_token(RNum *num, RNumCalc *nc) {
 	char ch = 0, c = 0;
-
 	do {
 		if (!cin_get(num, nc, &ch)) {
 			return nc->curr_tok = RNCEND;
 		}
 	} while (ch != '\n' && isspace((ut8)ch));
-
 	switch (ch) {
 	case 0:
 	case ';':
@@ -361,10 +370,16 @@ static RNumCalcToken get_token(RNum *num, RNumCalc *nc) {
 		}
 		cin_putback(num, nc, c);
 		return nc->curr_tok = RNCEND;
+
 	case '^':
 	case '&':
 	case '|':
 	case '*':
+		if (cin_get(num, nc, &c) && c == '*') {
+			return nc->curr_tok = RNPOW;
+		}
+		cin_putback(num, nc, c);
+		return nc->curr_tok = (RNumCalcToken)ch;
 	case '%':
 	case '/':
 	case '(':
@@ -460,10 +475,10 @@ RZ_API ut64 rz_num_calc(RNum *num, const char *str, const char **err) {
 	nc->calc_len = 0;
 	nc->calc_buf = NULL;
 	nc->under_calc = true;
-
 	load_token(num, nc, str);
 	get_token(num, nc);
 	n = expr(num, nc, 0);
+
 	if (err) {
 		*err = nc->calc_err;
 	}
